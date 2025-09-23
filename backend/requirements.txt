@@ -1,0 +1,3 @@
+# Add the dependencies here so its easier to setup the environment.
+FastAPI
+uvicorn

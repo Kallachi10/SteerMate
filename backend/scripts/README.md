@@ -1,0 +1,1 @@
+Here we run scripts for data processing and training the models and we store the trained models in `../models/`.
