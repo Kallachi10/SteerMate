@@ -119,7 +119,7 @@ async def get_trip_report(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Generate a report for a specific trip with analytics and recommendations."""
+    """Generate a report for a specific trip with analytics, safety score, and recommendations."""
     result = await db.execute(
         select(Trip)
         .options(selectinload(Trip.events), selectinload(Trip.sign_detections))
@@ -142,30 +142,51 @@ async def get_trip_report(
         "total_events": len(trip.events),
         "events_by_type": event_types,
         "signs_detected": len(trip.sign_detections),
-        "duration_minutes": (trip.duration_seconds or 0) / 60,
-        "distance_km": (trip.distance_m or 0) / 1000,
+        "duration_minutes": round((trip.duration_seconds or 0) / 60, 1),
+        "distance_km": round((trip.distance_m or 0) / 1000, 2),
     }
     
-    # Generate recommendations based on events
-    recommendations = []
+    # Use ML-based safety scorer (Phase 2)
+    from ml.driver_scoring import score_trip_data
     
-    if event_types.get("hard_brake", 0) > 2:
-        recommendations.append("Try to anticipate traffic conditions to avoid hard braking. Maintain safe following distance.")
+    # Convert ORM objects to dicts for scoring
+    trip_data = {
+        "distance_m": trip.distance_m,
+        "duration_seconds": trip.duration_seconds,
+        "avg_speed_m_s": trip.avg_speed_m_s,
+        "max_speed_m_s": trip.max_speed_m_s,
+    }
     
-    if event_types.get("overspeed", 0) > 0:
-        recommendations.append("Be mindful of speed limits. Consider using cruise control on highways.")
+    events_data = [
+        {
+            "event_type": e.event_type,
+            "speed_m_s": e.speed_m_s,
+            "accel_m_s2": e.accel_m_s2,
+            "timestamp": e.timestamp,
+        }
+        for e in trip.events
+    ]
     
-    if event_types.get("harsh_accel", 0) > 2:
-        recommendations.append("Smooth acceleration improves fuel efficiency and passenger comfort.")
+    detections_data = [
+        {
+            "sign_class": d.sign_class,
+            "confidence": d.confidence,
+            "ts": d.ts,
+        }
+        for d in trip.sign_detections
+    ]
     
-    if event_types.get("unsafe_curve", 0) > 0:
-        recommendations.append("Reduce speed before entering curves for better control and safety.")
-    
-    if not recommendations:
-        recommendations.append("Great driving! Keep up the good habits.")
+    # Get safety score and recommendations
+    scoring_result = score_trip_data(trip_data, events_data, detections_data)
     
     return TripReport(
         trip=trip,
         summary=summary,
-        recommendations=recommendations
+        recommendations=scoring_result["recommendations"],
+        safety_score=scoring_result["score"],
+        risk_level=scoring_result["risk_level"],
+        grade=scoring_result["grade"],
+        issues=scoring_result["issues"],
+        score_breakdown=scoring_result["breakdown"],
     )
+

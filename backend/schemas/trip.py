@@ -97,7 +97,14 @@ class TripSummary(BaseModel):
 
 
 class TripReport(BaseModel):
-    """Schema for trip report with analytics."""
+    """Schema for trip report with analytics and safety scoring."""
     trip: TripResponse
     summary: dict = Field(default_factory=dict, description="Summary statistics")
     recommendations: list[str] = Field(default_factory=list, description="Personalized recommendations")
+    
+    # Safety scoring (Phase 2)
+    safety_score: int = Field(100, ge=0, le=100, description="Overall safety score 0-100")
+    risk_level: str = Field("low", description="Risk level: low, medium, high")
+    grade: str = Field("A", description="Letter grade: A, B, C, D, F")
+    issues: list[str] = Field(default_factory=list, description="Detected driving issues")
+    score_breakdown: dict = Field(default_factory=dict, description="Score breakdown by category")

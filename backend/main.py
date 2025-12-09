@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import create_tables
-from routers import auth_router, user_router, trips_router
+from routers import auth_router, user_router, trips_router, detection_router
 
 # Import models to ensure they are registered with SQLAlchemy
 import models  # noqa: F401
@@ -39,6 +39,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(trips_router)
+app.include_router(detection_router)
 
 
 @app.get("/")

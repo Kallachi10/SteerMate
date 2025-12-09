@@ -12,6 +12,12 @@ from schemas.trip import (
     TripSummary,
     TripReport,
 )
+from schemas.detection import (
+    SignClassInfo,
+    DetectionResult,
+    DetectionResponse,
+    ModelInfo,
+)
 
 __all__ = [
     "UserCreate",
@@ -28,4 +34,9 @@ __all__ = [
     "TripResponse",
     "TripSummary",
     "TripReport",
+    "SignClassInfo",
+    "DetectionResult",
+    "DetectionResponse",
+    "ModelInfo",
 ]
+
