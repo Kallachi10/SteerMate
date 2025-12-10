@@ -1,0 +1,330 @@
+#!/usr/bin/env python3
+"""
+Convert GTSRB dataset to YOLO format for traffic sign detection.
+
+GTSRB dataset structure:
+- Train/0/, Train/1/, ..., Train/42/ (class folders with images)
+- Train.csv (Width,Height,Roi.X1,Roi.Y1,Roi.X2,Roi.Y2,ClassId,Path)
+- Test/*.png (test images without class folders)
+- Test.csv (similar format)
+"""
+
+import csv
+import shutil
+from pathlib import Path
+from typing import List, Tuple
+
+
+# GTSRB class names (43 classes, 0-42)
+GTSRB_CLASSES = [
+    "speed_limit_20",          # 0
+    "speed_limit_30",          # 1
+    "speed_limit_50",          # 2
+    "speed_limit_60",          # 3
+    "speed_limit_70",          # 4
+    "speed_limit_80",          # 5
+    "end_speed_limit_80",      # 6
+    "speed_limit_100",         # 7
+    "speed_limit_120",         # 8
+    "no_passing",              # 9
+    "no_passing_over_3_5t",    # 10
+    "right_of_way_next",       # 11
+    "priority_road",           # 12
+    "yield",                   # 13
+    "stop",                    # 14
+    "no_vehicles",             # 15
+    "no_vehicles_over_3_5t",   # 16
+    "no_entry",                # 17
+    "general_caution",         # 18
+    "dangerous_curve_left",    # 19
+    "dangerous_curve_right",   # 20
+    "double_curve",            # 21
+    "bumpy_road",              # 22
+    "slippery_road",           # 23
+    "road_narrows_right",      # 24
+    "road_work",               # 25
+    "traffic_signals",         # 26
+    "pedestrians",             # 27
+    "children_crossing",       # 28
+    "bicycles_crossing",       # 29
+    "beware_ice_snow",         # 30
+    "wild_animals_crossing",   # 31
+    "end_all_limits",          # 32
+    "turn_right_ahead",        # 33
+    "turn_left_ahead",         # 34
+    "ahead_only",              # 35
+    "go_straight_or_right",    # 36
+    "go_straight_or_left",     # 37
+    "keep_right",              # 38
+    "keep_left",               # 39
+    "roundabout_mandatory",    # 40
+    "end_no_passing",          # 41
+    "end_no_passing_3_5t",     # 42
+]
+
+
+def convert_bbox_to_yolo(
+    width: int, height: int, 
+    x1: int, y1: int, x2: int, y2: int
+) -> Tuple[float, float, float, float]:
+    """
+    Convert absolute bounding box to YOLO format (normalized center + size).
+    
+    YOLO format: <x_center> <y_center> <width> <height> (all normalized 0-1)
+    """
+    # Calculate center
+    x_center = (x1 + x2) / 2.0 / width
+    y_center = (y1 + y2) / 2.0 / height
+    
+    # Calculate size
+    box_width = (x2 - x1) / width
+    box_height = (y2 - y1) / height
+    
+    # Clamp to valid range
+    x_center = max(0.0, min(1.0, x_center))
+    y_center = max(0.0, min(1.0, y_center))
+    box_width = max(0.0, min(1.0, box_width))
+    box_height = max(0.0, min(1.0, box_height))
+    
+    return x_center, y_center, box_width, box_height
+
+
+def process_csv(
+    csv_path: Path,
+    src_root: Path,
+    dest_images: Path,
+    dest_labels: Path,
+    prefix: str = ""
+) -> int:
+    """Process CSV file and convert to YOLO format."""
+    count = 0
+    
+    with open(csv_path, 'r') as f:
+        reader = csv.DictReader(f)
+        
+        for row in reader:
+            try:
+                # Parse row
+                width = int(row['Width'])
+                height = int(row['Height'])
+                x1 = int(row['Roi.X1'])
+                y1 = int(row['Roi.Y1'])
+                x2 = int(row['Roi.X2'])
+                y2 = int(row['Roi.Y2'])
+                class_id = int(row['ClassId'])
+                img_path = row['Path']
+                
+                # Source image path
+                src_img = src_root / img_path
+                if not src_img.exists():
+                    continue
+                
+                # Create unique filename
+                img_name = f"{prefix}{count:06d}.png"
+                label_name = f"{prefix}{count:06d}.txt"
+                
+                # Copy image
+                dest_img = dest_images / img_name
+                shutil.copy(src_img, dest_img)
+                
+                # Convert bbox to YOLO format
+                x_c, y_c, w, h = convert_bbox_to_yolo(
+                    width, height, x1, y1, x2, y2
+                )
+                
+                # Write label file
+                dest_label = dest_labels / label_name
+                with open(dest_label, 'w') as lf:
+                    lf.write(f"{class_id} {x_c:.6f} {y_c:.6f} {w:.6f} {h:.6f}\n")
+                
+                count += 1
+                
+                if count % 1000 == 0:
+                    print(f"  Processed {count} images...")
+                    
+            except Exception as e:
+                print(f"Error processing row: {e}")
+                continue
+    
+    return count
+
+
+def create_yaml_config(output_dir: Path, num_classes: int = 43):
+    """Create YOLO dataset configuration file."""
+    yaml_content = f"""# GTSRB Traffic Sign Dataset for YOLOv8
+# Auto-generated by convert_gtsrb_to_yolo.py
+
+path: {output_dir.absolute()}
+train: images/train
+val: images/val
+test: images/test
+
+# Number of classes
+nc: {num_classes}
+
+# Class names
+names:
+"""
+    for i, name in enumerate(GTSRB_CLASSES):
+        yaml_content += f"  {i}: {name}\n"
+    
+    config_path = output_dir / "traffic_signs.yaml"
+    with open(config_path, 'w') as f:
+        f.write(yaml_content)
+    
+    print(f"Created YOLO config: {config_path}")
+    return config_path
+
+
+def main():
+    """Convert GTSRB dataset to YOLO format."""
+    print("=" * 60)
+    print("GTSRB to YOLO Format Converter")
+    print("=" * 60)
+    print()
+    
+    # Paths
+    SCRIPT_DIR = Path(__file__).parent
+    PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent  # Steer-Mate root
+    GTSRB_DIR = PROJECT_ROOT / "GTSRB"
+    OUTPUT_DIR = SCRIPT_DIR.parent / "data"
+    
+    # Check if GTSRB exists
+    if not GTSRB_DIR.exists():
+        print(f"ERROR: GTSRB dataset not found at {GTSRB_DIR}")
+        print("Please download from: https://www.kaggle.com/datasets/meowmeowmeowmeowmeow/gtsrb-german-traffic-sign")
+        return 1
+    
+    print(f"GTSRB directory: {GTSRB_DIR}")
+    print(f"Output directory: {OUTPUT_DIR}")
+    print()
+    
+    # Create output directories
+    for split in ['train', 'val', 'test']:
+        (OUTPUT_DIR / 'images' / split).mkdir(parents=True, exist_ok=True)
+        (OUTPUT_DIR / 'labels' / split).mkdir(parents=True, exist_ok=True)
+    
+    # Process training data (use 90% train, 10% val)
+    train_csv = GTSRB_DIR / "Train.csv"
+    if train_csv.exists():
+        print("Processing training data...")
+        
+        # Read all training entries
+        train_entries = []
+        with open(train_csv, 'r') as f:
+            reader = csv.DictReader(f)
+            train_entries = list(reader)
+        
+        # Shuffle and split
+        import random
+        random.seed(42)
+        random.shuffle(train_entries)
+        
+        split_idx = int(len(train_entries) * 0.9)
+        train_data = train_entries[:split_idx]
+        val_data = train_entries[split_idx:]
+        
+        print(f"  Training samples: {len(train_data)}")
+        print(f"  Validation samples: {len(val_data)}")
+        
+        # Process training split
+        train_count = 0
+        for entry in train_data:
+            try:
+                width = int(entry['Width'])
+                height = int(entry['Height'])
+                x1 = int(entry['Roi.X1'])
+                y1 = int(entry['Roi.Y1'])
+                x2 = int(entry['Roi.X2'])
+                y2 = int(entry['Roi.Y2'])
+                class_id = int(entry['ClassId'])
+                img_path = entry['Path']
+                
+                src_img = GTSRB_DIR / img_path
+                if not src_img.exists():
+                    continue
+                
+                img_name = f"train_{train_count:06d}.png"
+                label_name = f"train_{train_count:06d}.txt"
+                
+                shutil.copy(src_img, OUTPUT_DIR / 'images' / 'train' / img_name)
+                
+                x_c, y_c, w, h = convert_bbox_to_yolo(width, height, x1, y1, x2, y2)
+                with open(OUTPUT_DIR / 'labels' / 'train' / label_name, 'w') as lf:
+                    lf.write(f"{class_id} {x_c:.6f} {y_c:.6f} {w:.6f} {h:.6f}\n")
+                
+                train_count += 1
+                if train_count % 5000 == 0:
+                    print(f"    Processed {train_count} training images...")
+                    
+            except Exception as e:
+                continue
+        
+        print(f"  Created {train_count} training samples")
+        
+        # Process validation split
+        val_count = 0
+        for entry in val_data:
+            try:
+                width = int(entry['Width'])
+                height = int(entry['Height'])
+                x1 = int(entry['Roi.X1'])
+                y1 = int(entry['Roi.Y1'])
+                x2 = int(entry['Roi.X2'])
+                y2 = int(entry['Roi.Y2'])
+                class_id = int(entry['ClassId'])
+                img_path = entry['Path']
+                
+                src_img = GTSRB_DIR / img_path
+                if not src_img.exists():
+                    continue
+                
+                img_name = f"val_{val_count:06d}.png"
+                label_name = f"val_{val_count:06d}.txt"
+                
+                shutil.copy(src_img, OUTPUT_DIR / 'images' / 'val' / img_name)
+                
+                x_c, y_c, w, h = convert_bbox_to_yolo(width, height, x1, y1, x2, y2)
+                with open(OUTPUT_DIR / 'labels' / 'val' / label_name, 'w') as lf:
+                    lf.write(f"{class_id} {x_c:.6f} {y_c:.6f} {w:.6f} {h:.6f}\n")
+                
+                val_count += 1
+                    
+            except Exception as e:
+                continue
+        
+        print(f"  Created {val_count} validation samples")
+    
+    # Process test data
+    test_csv = GTSRB_DIR / "Test.csv"
+    if test_csv.exists():
+        print("\nProcessing test data...")
+        test_count = process_csv(
+            test_csv, GTSRB_DIR,
+            OUTPUT_DIR / 'images' / 'test',
+            OUTPUT_DIR / 'labels' / 'test',
+            prefix="test_"
+        )
+        print(f"  Created {test_count} test samples")
+    
+    # Create YOLO config
+    print()
+    create_yaml_config(OUTPUT_DIR)
+    
+    print()
+    print("=" * 60)
+    print("Conversion complete!")
+    print("=" * 60)
+    print()
+    print(f"Dataset saved to: {OUTPUT_DIR}")
+    print()
+    print("Next steps:")
+    print("  1. Run training: python train_yolov8.py")
+    print()
+    
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())
