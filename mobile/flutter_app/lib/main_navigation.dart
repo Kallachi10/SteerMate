@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_dashboard.dart';
+import 'checker_background.dart';
+import 'main.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -9,9 +11,9 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  int _currentIndex = 0;
+  int index = 0;
 
-  final List<Widget> _pages = [
+  final pages = const [
     HomeDashboard(),
     TripsPage(),
     AnalyticsPage(),
@@ -21,69 +23,33 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_currentIndex],
-
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
-
-        type: BottomNavigationBarType.fixed,
-
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Home",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: "Trips",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.show_chart),
-            label: "Analytics",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: "Profile",
-          ),
+      body: pages[index],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: index,
+        onDestinationSelected: (i) => setState(() => index = i),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home), label: "Home"),
+          NavigationDestination(icon: Icon(Icons.map), label: "Trips"),
+          NavigationDestination(icon: Icon(Icons.show_chart), label: "Analytics"),
+          NavigationDestination(icon: Icon(Icons.person), label: "Profile"),
         ],
       ),
     );
   }
 }
 
-
-// -------------------------------
-// Placeholder Pages
-// -------------------------------
-
 class TripsPage extends StatelessWidget {
   const TripsPage({super.key});
-
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(child: Text("Trips Page")),
-    );
-  }
+  Widget build(BuildContext context) =>
+      const CheckerBackground(child: Center(child: Text("Trips Page", style: TextStyle(color: Colors.white, fontSize: 24))));
 }
 
 class AnalyticsPage extends StatelessWidget {
   const AnalyticsPage({super.key});
-
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(child: Text("Analytics Page")),
-    );
-  }
+  Widget build(BuildContext context) =>
+      const CheckerBackground(child: Center(child: Text("Analytics Page", style: TextStyle(color: Colors.white, fontSize: 24))));
 }
 
 class ProfilePage extends StatelessWidget {
@@ -91,8 +57,33 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(child: Text("Profile Page")),
+    return CheckerBackground(
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const CircleAvatar(
+                radius: 48,
+                child: Icon(Icons.person, size: 48),
+              ),
+              const SizedBox(height: 16),
+              const Text("Driver Profile",
+                  style: TextStyle(fontSize: 22, color: Colors.white)),
+              const SizedBox(height: 24),
+              SwitchListTile(
+                title: const Text("Dark Mode",
+                    style: TextStyle(color: Colors.white)),
+                value: themeNotifier.value == ThemeMode.dark,
+                onChanged: (_) => themeNotifier.value =
+                    themeNotifier.value == ThemeMode.dark
+                        ? ThemeMode.light
+                        : ThemeMode.dark,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
