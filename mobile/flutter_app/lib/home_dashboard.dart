@@ -35,7 +35,7 @@ class HomeDashboard extends StatelessWidget {
 
                 SizedBox(height: 20),
 
-                // ✅ YOUR ORIGINAL SUMMARY CARD (UNCHANGED)
+                
                 Container(
                   width: double.infinity,
                   padding: EdgeInsets.all(20),

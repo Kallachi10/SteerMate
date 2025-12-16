@@ -17,7 +17,7 @@ class LoginPage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text(
-                  "Welcome Back",
+                  "Welcome",
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
@@ -58,11 +58,21 @@ class LoginPage extends StatelessWidget {
     return TextField(
       controller: c,
       obscureText: obscure,
+      style: const TextStyle(
+      color: Colors.black, // change to any color you want
+      fontSize: 16
+      ),
+
       decoration: InputDecoration(
         labelText: l,
         filled: true,
         fillColor: Colors.white,
+        floatingLabelBehavior: FloatingLabelBehavior.never,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color.fromARGB(255, 2, 31, 55), width: 2),
+        ),
       ),
     );
   }
