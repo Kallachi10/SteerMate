@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
-import 'main_navigation.dart';
 import 'checker_background.dart';
-import 'signup_page.dart';
 import 'package:http/http.dart' as http;
 
-class LoginPage extends StatelessWidget {
+class SignUpPage extends StatelessWidget {
   final TextEditingController email = TextEditingController();
   final TextEditingController password = TextEditingController();
+  final TextEditingController confirmPassword = TextEditingController();
 
-  void showError(BuildContext context, String message) {
+  bool isValidEmail(String value) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value);
+  }
+
+  bool isStrongPassword(String value) {
+    return RegExp(r'^(?=.*\d)(?=.*[@$!%*?&]).{8,}$').hasMatch(value);
+  }
+
+  void showMessage(BuildContext context, String message, bool success) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
     );
   }
 
@@ -25,7 +35,7 @@ class LoginPage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text(
-                  "Welcome",
+                  "Create Account",
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
@@ -36,13 +46,34 @@ class LoginPage extends StatelessWidget {
                 _field(email, "Email"),
                 const SizedBox(height: 16),
                 _field(password, "Password", obscure: true),
+                const SizedBox(height: 16),
+                _field(confirmPassword, "Confirm Password", obscure: true),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () async {
+                      if (!isValidEmail(email.text)) {
+                        showMessage(context, "Enter a valid email address", false);
+                        return;
+                      }
+
+                      if (!isStrongPassword(password.text)) {
+                        showMessage(
+                          context,
+                          "Password must be 8+ chars with a number and symbol",
+                          false,
+                        );
+                        return;
+                      }
+
+                      if (password.text != confirmPassword.text) {
+                        showMessage(context, "Passwords do not match", false);
+                        return;
+                      }
+
                       final response = await http.post(
-                        Uri.parse('http://127.0.0.1:8000/auth/login'),
+                        Uri.parse('http://127.0.0.1:8000/auth/register'),
                         headers: {
                           'Content-Type': 'application/x-www-form-urlencoded',
                         },
@@ -52,32 +83,18 @@ class LoginPage extends StatelessWidget {
                         },
                       );
 
-                      if (response.statusCode == 200) {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => MainNavigation()),
-                        );
+                      if (response.statusCode == 200 ||
+                          response.statusCode == 201) {
+                        showMessage(context, "Account created successfully", true);
+                        Navigator.pop(context);
                       } else {
-                        showError(context, 'Invalid email or password');
+                        showMessage(context, "Registration failed", false);
                       }
                     },
                     child: const Padding(
                       padding: EdgeInsets.symmetric(vertical: 14),
-                      child: Text("Login", style: TextStyle(fontSize: 18)),
+                      child: Text("Sign Up", style: TextStyle(fontSize: 18)),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => SignUpPage()),
-                    );
-                  },
-                  child: const Text(
-                    "Don’t have an account? Sign Up",
-                    style: TextStyle(color: Colors.white),
                   ),
                 ),
               ],
@@ -99,13 +116,6 @@ class LoginPage extends StatelessWidget {
         fillColor: Colors.white,
         floatingLabelBehavior: FloatingLabelBehavior.never,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: Color.fromARGB(255, 2, 31, 55),
-            width: 2,
-          ),
-        ),
       ),
     );
   }
